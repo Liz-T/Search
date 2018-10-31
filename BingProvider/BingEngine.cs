@@ -13,7 +13,7 @@
 
     public class BingEngine : IEngine
     {
-        public async Task<Feed> Search(string searchTerms, int startIndex, int count)
+        public async Task<Feed> Query(string searchTerms, int startIndex, int count)
         {
             if (count > 50)
             {
@@ -22,13 +22,14 @@
 
             var result = await QueryBing(searchTerms, startIndex, count);
 
-            if (result != null)
+            if (result == null)
             {
-                var items = result.Value.Select(item => Response.ConvertToSyndicationItem(item.Name, item.Snippet, item.DisplayUrl.ToString(), new Uri(item.Url))).ToList();
-                return Response.ConvertToOpenSearchResponse(items, (int)result.TotalEstimatedMatches, searchTerms, startIndex, count);
+                return Response.ConvertToOpenSearchResponse(null, 0, searchTerms, startIndex, count);
             }
 
-            return Response.ConvertToOpenSearchResponse(Enumerable.Empty<SyndicationItem>(), 0, searchTerms, startIndex, count);
+            var items = result.Value.Select(item => Response.ConvertToSyndicationItem(item.Name, item.Snippet, item.DisplayUrl.ToString(), new Uri(item.Url))).ToList();
+
+            return Response.ConvertToOpenSearchResponse(items, (int)result.TotalEstimatedMatches, searchTerms, startIndex, count);
         }
 
         private static async Task<Bing.WebWebAnswer> QueryBing(string searchTerms, int startIndex, int count)
@@ -38,7 +39,14 @@
             var client = new WebSearchAPI(credentials);
             var query = string.Format("site:parliament.uk {0}", searchTerms);
             var filter = new List<string> { "Webpages" };
-            var response = await client.Web.SearchAsync(query, responseFilter: filter, offset: startIndex - 1, count: count, market: "en-GB");
+            var response = await client.Web.SearchAsync(
+                query,
+                responseFilter: filter,
+                offset: startIndex - 1,
+                count: count,
+                market: "en-GB",
+                textDecorations: true,
+                textFormat: "HTML");
 
             return response.WebPages;
         }
